@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VitalDB PPG Analysis Pipeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .pipeline-step {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .pipeline-step.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            margin-right: 15px;
+        }
+
+        .step-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .data-table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 500;
+        }
+
+        table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .plot-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            color: #667eea;
+            font-size: 13px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-card .unit {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .download-links {
+            margin: 15px 0;
+        }
+
+        .download-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 15px;
+            font-weight: 500;
+        }
+
+        .download-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>VitalDB PPG Analysis Pipeline</h1>
+            <p>Interactive PPG Data Extraction, Cleansing, and Peak Detection</p>
+        </div>
+
+        <div class="content">
+            <!-- Step 1: Input Case ID and Select Track -->
+            <div class="pipeline-step" id="step1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Select Case and Track</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="caseId">Case ID:</label>
+                    <input type="number" id="caseId" placeholder="Enter VitalDB case ID (e.g., 1)">
+                </div>
+
+                <button class="btn btn-primary" onclick="loadTracks()">Load Available Tracks</button>
+
+                <div id="trackSelection" class="hidden" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label for="trackSelect">Select PPG Track:</label>
+                        <select id="trackSelect"></select>
+                    </div>
+                    <button class="btn btn-success" onclick="downloadData()">Download Data</button>
+                </div>
+
+                <div id="step1Status"></div>
+            </div>
+
+            <!-- Step 2: View Raw Data -->
+            <div class="pipeline-step disabled" id="step2">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Raw Data</div>
+                </div>
+
+                <div id="step2Status"></div>
+                <div id="rawDataStats" class="stats-grid hidden"></div>
+                <div id="rawDataPlot" class="plot-container hidden"></div>
+                <div id="rawDataTable" class="data-table-container hidden"></div>
+                <div id="rawDataDownload" class="download-links hidden"></div>
+
+                <div id="cleanseButton" class="hidden" style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="cleanseData()">Cleanse Data</button>
+                </div>
+            </div>
+
+            <!-- Step 3: View Cleansed Data -->
+            <div class="pipeline-step disabled" id="step3">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Cleansed Data</div>
+                </div>
+
+                <div id="step3Status"></div>
+                <div id="cleansedDataStats" class="stats-grid hidden"></div>
+                <div id="cleansedDataPlot" class="plot-container hidden"></div>
+                <div id="cleansedDataTable" class="data-table-container hidden"></div>
+                <div id="cleansedDataDownload" class="download-links hidden"></div>
+
+                <div id="peakDetectButton" class="hidden" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label for="heightThreshold">Height Threshold Multiplier:</label>
+                        <input type="number" id="heightThreshold" value="0.3" step="0.1" min="0" max="2"
+                               style="width: 150px; margin-right: 10px;">
+                        <span style="font-size: 12px; color: #666;">
+                            (threshold = mean + multiplier × std)
+                        </span>
+                    </div>
+                    <div class="form-group">
+                        <label for="distanceThreshold">Distance Threshold Multiplier:</label>
+                        <input type="number" id="distanceThreshold" value="0.8" step="0.1" min="0.1" max="2"
+                               style="width: 150px; margin-right: 10px;">
+                        <span style="font-size: 12px; color: #666;">
+                            (min distance = multiplier × sampling_rate)
+                        </span>
+                    </div>
+                    <button class="btn btn-success" onclick="detectPeaks()">Detect Peaks</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Peak Detection Results -->
+            <div class="pipeline-step disabled" id="step4">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <div class="step-title">Peak Detection Results</div>
+                </div>
+
+                <div id="step4Status"></div>
+                <div id="peakStats" class="stats-grid hidden"></div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #667eea;">Signal Plots with Detected Peaks</h3>
+                <div id="peakPlotsOriginal" class="plot-container hidden"></div>
+                <div id="peakPlotsPreprocessed" class="plot-container hidden"></div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #667eea;">Template Analysis</h3>
+                <div id="peakPlotTemplate" class="plot-container hidden"></div>
+                <div id="peakPlotWindowsComparison" class="plot-container hidden"></div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #667eea;">Peaks Data</h3>
+                <div id="peakDataTable" class="data-table-container hidden"></div>
+                <div id="peakDataDownload" class="download-links hidden"></div>
+            </div>
+
+            <!-- Step 5: Glucose Labels for Training -->
+            <div class="pipeline-step disabled" id="step5">
+                <div class="step-header">
+                    <div class="step-number">5</div>
+                    <div class="step-title">Glucose Labels (for Training)</div>
+                </div>
+
+                <div class="info-box" style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px;">
+                    <strong>Training Data Preparation:</strong> Extract actual glucose measurements from VitalDB for this case, or enter manually.
+                    This creates the <code>glucose_labels.csv</code> file needed for training the ResNet34-1D model.
+                </div>
+
+                <div id="step5Status"></div>
+
+                <div id="glucoseLabelForm" class="hidden">
+                    <p style="margin-bottom: 15px;">
+                        <strong>Number of filtered windows:</strong> <span id="numWindows">0</span>
+                    </p>
+
+                    <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                        <h4 style="margin-top: 0; color: #667eea;">Option 1: Extract from VitalDB (Recommended)</h4>
+                        <p style="margin-bottom: 10px;">Automatically extract glucose measurements from this case and match to PPG windows.</p>
+
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label for="matchingMethod">Matching Method:</label>
+                            <select id="matchingMethod" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="interpolate" selected>Interpolate (Linear interpolation between measurements)</option>
+                                <option value="nearest">Nearest (Use closest measurement in time)</option>
+                                <option value="last_known">Last Known (Forward fill from last measurement)</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-success" onclick="extractGlucoseFromVitalDB()">Extract Glucose from VitalDB</button>
+                    </div>
+
+                    <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                        <h4 style="margin-top: 0; color: #667eea;">Option 2: Manual Entry</h4>
+                        <p style="margin-bottom: 10px;">Enter glucose values manually if VitalDB doesn't have glucose data for this case.</p>
+
+                        <div class="form-group">
+                            <label for="glucoseInput">Glucose Values (mg/dL):</label>
+                            <textarea id="glucoseInput" rows="6" placeholder="Enter glucose values, one per line or comma-separated&#10;Example:&#10;120.5&#10;115.3&#10;130.2&#10;...&#10;&#10;Or: 120.5, 115.3, 130.2, ..." style="width: 100%; font-family: monospace; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                            <small style="color: #666;">Enter one glucose value per line, or separate with commas. Values should be in mg/dL (typical range: 70-180).</small>
+                        </div>
+
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-primary" onclick="saveGlucoseLabels()">Save Manual Glucose Labels</button>
+                            <button class="btn btn-secondary" onclick="generateRandomGlucose()" style="margin-left: 10px;">Generate Random (for testing)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="glucoseStats" class="stats-grid hidden" style="margin-top: 20px;"></div>
+                <div id="glucoseDownload" class="download-links hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let currentCaseId = null;
+        let currentTrack = null;
+
+        function showStatus(stepId, message, type = 'info') {
+            const statusDiv = document.getElementById(`${stepId}Status`);
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }
+
+        function createTable(data, containerId) {
+            if (!data || data.length === 0) return;
+
+            const keys = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+            keys.forEach(key => {
+                html += `<th>${key}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                keys.forEach(key => {
+                    const value = row[key];
+                    const displayValue = typeof value === 'number' ? value.toFixed(4) : value;
+                    html += `<td>${displayValue}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById(containerId).innerHTML = html;
+            document.getElementById(containerId).classList.remove('hidden');
+        }
+
+        async function loadTracks() {
+            const caseId = document.getElementById('caseId').value;
+            if (!caseId) {
+                showStatus('step1', 'Please enter a case ID', 'error');
+                return;
+            }
+
+            currentCaseId = caseId;
+            showStatus('step1', 'Loading available tracks... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/get_tracks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({case_id: caseId})
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showStatus('step1', `Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                // Populate track dropdown
+                const select = document.getElementById('trackSelect');
+                select.innerHTML = '';
+                data.tracks.forEach(track => {
+                    const option = document.createElement('option');
+                    option.value = track.name;
+                    option.textContent = `${track.name} (${track.rate} Hz)`;
+                    select.appendChild(option);
+                });
+
+                document.getElementById('trackSelection').classList.remove('hidden');
+                showStatus('step1', `Found ${data.tracks.length} PPG tracks`, 'success');
+
+            } catch (error) {
+                showStatus('step1', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function downloadData() {
+            const trackName = document.getElementById('trackSelect').value;
+            currentTrack = trackName;
+
+            showStatus('step1', 'Downloading data from VitalDB... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/download_data', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        case_id: currentCaseId,
+                        track_name: trackName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showStatus('step1', `Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                sessionId = data.session_id;
+                showStatus('step1', 'Data downloaded successfully!', 'success');
+
+                // Enable and populate step 2
+                document.getElementById('step2').classList.remove('disabled');
+
+                // Show stats
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h4>Total Rows</h4>
+                        <div class="value">${data.total_rows.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>NaN Time Values</h4>
+                        <div class="value">${data.nan_time.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>NaN Signal Values</h4>
+                        <div class="value">${data.nan_signal.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Sampling Rate</h4>
+                        <div class="value">${data.sampling_rate.toFixed(1)}</div>
+                        <div class="unit">Hz</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Duration</h4>
+                        <div class="value">${(data.duration / 60).toFixed(1)}</div>
+                        <div class="unit">minutes</div>
+                    </div>
+                `;
+                document.getElementById('rawDataStats').innerHTML = statsHtml;
+                document.getElementById('rawDataStats').classList.remove('hidden');
+
+                // Show status
+                if (data.has_issues) {
+                    showStatus('step2', 'Raw data has NaN values. Cleansing is required.', 'warning');
+                    document.getElementById('cleanseButton').classList.remove('hidden');
+                } else {
+                    showStatus('step2', 'Raw data looks good! You can proceed to peak detection.', 'success');
+                    // Skip to step 3
+                    document.getElementById('step3').classList.remove('disabled');
+                    document.getElementById('peakDetectButton').classList.remove('hidden');
+                }
+
+                // Show plot
+                if (data.plot_image) {
+                    document.getElementById('rawDataPlot').innerHTML = `<img src="${data.plot_image}" alt="Raw PPG Signal">`;
+                    document.getElementById('rawDataPlot').classList.remove('hidden');
+                }
+
+                // Show data table
+                createTable(data.preview_data, 'rawDataTable');
+
+                // Download link
+                document.getElementById('rawDataDownload').innerHTML =
+                    `<a href="/api/download_csv/${sessionId}/raw" download>Download Raw CSV</a>`;
+                document.getElementById('rawDataDownload').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('step1', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function cleanseData() {
+            showStatus('step2', 'Cleansing data... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/cleanse_data', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id: sessionId})
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showStatus('step2', `Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                showStatus('step2', 'Data cleansed successfully!', 'success');
+
+                // Enable step 3
+                document.getElementById('step3').classList.remove('disabled');
+
+                // Show stats
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h4>Original Rows</h4>
+                        <div class="value">${data.original_rows.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Cleansed Rows</h4>
+                        <div class="value">${data.cleansed_rows.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Removed Rows</h4>
+                        <div class="value">${data.removed_rows.toLocaleString()}</div>
+                    </div>
+                `;
+                document.getElementById('cleansedDataStats').innerHTML = statsHtml;
+                document.getElementById('cleansedDataStats').classList.remove('hidden');
+
+                showStatus('step3', 'Cleansed data is ready. You can now detect peaks.', 'success');
+
+                // Show plot
+                if (data.plot_image) {
+                    document.getElementById('cleansedDataPlot').innerHTML = `<img src="${data.plot_image}" alt="Cleansed PPG Signal">`;
+                    document.getElementById('cleansedDataPlot').classList.remove('hidden');
+                }
+
+                // Show data table
+                createTable(data.preview_data, 'cleansedDataTable');
+
+                // Download link
+                document.getElementById('cleansedDataDownload').innerHTML =
+                    `<a href="/api/download_csv/${sessionId}/cleansed" download>Download Cleansed CSV</a>`;
+                document.getElementById('cleansedDataDownload').classList.remove('hidden');
+
+                // Show peak detect button
+                document.getElementById('peakDetectButton').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('step2', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function detectPeaks() {
+            const heightMultiplier = parseFloat(document.getElementById('heightThreshold').value);
+            const distanceMultiplier = parseFloat(document.getElementById('distanceThreshold').value);
+
+            showStatus('step3', 'Detecting peaks... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/detect_peaks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        height_multiplier: heightMultiplier,
+                        distance_multiplier: distanceMultiplier
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showStatus('step3', `Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                showStatus('step3', 'Peak detection complete!', 'success');
+
+                // Enable step 4
+                document.getElementById('step4').classList.remove('disabled');
+
+                // Show stats
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h4>Total Peaks</h4>
+                        <div class="value">${data.total_peaks.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Mean Heart Rate</h4>
+                        <div class="value">${data.mean_hr.toFixed(1)}</div>
+                        <div class="unit">± ${data.std_hr.toFixed(1)} bpm</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Mean Interval</h4>
+                        <div class="value">${data.mean_interval.toFixed(3)}</div>
+                        <div class="unit">± ${data.std_interval.toFixed(3)} sec</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Height Threshold</h4>
+                        <div class="value">${data.height_threshold.toFixed(2)}</div>
+                        <div class="unit">(${data.height_multiplier}× std)</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Distance Threshold</h4>
+                        <div class="value">${data.distance_threshold.toFixed(0)}</div>
+                        <div class="unit">(${data.distance_multiplier}× fs) samples</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Extracted Windows</h4>
+                        <div class="value">${data.num_all_windows}</div>
+                        <div class="unit">total windows</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Filtered Windows</h4>
+                        <div class="value">${data.num_filtered_windows}</div>
+                        <div class="unit">(${data.filtering_rate.toFixed(1)}% kept)</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Mean Similarity</h4>
+                        <div class="value">${data.mean_similarity.toFixed(3)}</div>
+                        <div class="unit">min: ${data.min_similarity.toFixed(3)}</div>
+                    </div>
+                `;
+                document.getElementById('peakStats').innerHTML = statsHtml;
+                document.getElementById('peakStats').classList.remove('hidden');
+
+                showStatus('step4', `Detected ${data.total_peaks} peaks with mean HR ${data.mean_hr.toFixed(1)} bpm`, 'success');
+
+                // Show plots
+                document.getElementById('peakPlotsOriginal').innerHTML =
+                    `<h3 style="margin-bottom: 10px;">Original Signal with Peaks</h3><img src="${data.plot_original}" alt="Original with Peaks">`;
+                document.getElementById('peakPlotsOriginal').classList.remove('hidden');
+
+                document.getElementById('peakPlotsPreprocessed').innerHTML =
+                    `<h3 style="margin-bottom: 10px;">Preprocessed Signal with Peaks</h3><img src="${data.plot_preprocessed}" alt="Preprocessed with Peaks">`;
+                document.getElementById('peakPlotsPreprocessed').classList.remove('hidden');
+
+                // Show template plot if available
+                if (data.plot_template) {
+                    document.getElementById('peakPlotTemplate').innerHTML =
+                        `<h3 style="margin-bottom: 10px;">Computed Template (Average Beat)</h3><img src="${data.plot_template}" alt="Template">`;
+                    document.getElementById('peakPlotTemplate').classList.remove('hidden');
+                }
+
+                // Show windows comparison plot if available
+                if (data.plot_windows_comparison) {
+                    document.getElementById('peakPlotWindowsComparison').innerHTML =
+                        `<h3 style="margin-bottom: 10px;">Windows Comparison (All vs Filtered)</h3><img src="${data.plot_windows_comparison}" alt="Windows Comparison">`;
+                    document.getElementById('peakPlotWindowsComparison').classList.remove('hidden');
+                }
+
+                // Show data table
+                createTable(data.preview_data, 'peakDataTable');
+
+                // Download links
+                const downloadLinksHtml = `
+                    <a href="/api/download_csv/${sessionId}/peaks" download>Download Peaks CSV</a>
+                    <a href="/api/download_csv/${sessionId}/filtered_windows" download>Download Filtered Windows Summary CSV</a>
+                    <a href="/api/download_csv/${sessionId}/filtered_windows_detailed" download>Download Filtered Windows Detailed CSV</a>
+                `;
+                document.getElementById('peakDataDownload').innerHTML = downloadLinksHtml;
+                document.getElementById('peakDataDownload').classList.remove('hidden');
+
+                // Enable step 5 (glucose labels)
+                document.getElementById('step5').classList.remove('disabled');
+                document.getElementById('numWindows').textContent = data.num_filtered_windows;
+                document.getElementById('glucoseLabelForm').classList.remove('hidden');
+                showStatus('step5', 'Ready to enter glucose labels', 'info');
+
+            } catch (error) {
+                showStatus('step3', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function extractGlucoseFromVitalDB() {
+            const matchingMethod = document.getElementById('matchingMethod').value;
+
+            showStatus('step5', 'Extracting glucose data from VitalDB... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/extract_glucose', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        matching_method: matchingMethod
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (data.suggestion) {
+                        showStatus('step5', `Error: ${data.error}<br><em>${data.suggestion}</em>`, 'error');
+                    } else {
+                        showStatus('step5', `Error: ${data.error}`, 'error');
+                    }
+                    return;
+                }
+
+                showStatus('step5', `${data.message} (${data.num_valid}/${data.num_labels} windows matched)`, 'success');
+
+                // Show statistics
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h4>Source</h4>
+                        <div class="value" style="font-size: 14px;">${data.glucose_track}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Matching Method</h4>
+                        <div class="value" style="font-size: 14px;">${data.matching_method}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Total Labels</h4>
+                        <div class="value">${data.num_labels}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Valid Matches</h4>
+                        <div class="value">${data.num_valid}</div>
+                        <div class="unit">(${(data.num_valid/data.num_labels*100).toFixed(1)}%)</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Mean Glucose</h4>
+                        <div class="value">${data.stats.mean.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Std Deviation</h4>
+                        <div class="value">${data.stats.std.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Min Glucose</h4>
+                        <div class="value">${data.stats.min.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Max Glucose</h4>
+                        <div class="value">${data.stats.max.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                `;
+                document.getElementById('glucoseStats').innerHTML = statsHtml;
+                document.getElementById('glucoseStats').classList.remove('hidden');
+
+                // Download link
+                const downloadHtml = `
+                    <a href="/api/download_csv/${sessionId}/glucose_labels" download>Download Glucose Labels CSV</a>
+                `;
+                document.getElementById('glucoseDownload').innerHTML = downloadHtml;
+                document.getElementById('glucoseDownload').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('step5', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function generateRandomGlucose() {
+            const numWindows = parseInt(document.getElementById('numWindows').textContent);
+            if (numWindows === 0) {
+                showStatus('step5', 'No windows available. Run peak detection first.', 'error');
+                return;
+            }
+
+            // Generate random glucose values between 70-180 mg/dL (normal to high range)
+            const glucoseValues = [];
+            for (let i = 0; i < numWindows; i++) {
+                const value = (Math.random() * (180 - 70) + 70).toFixed(1);
+                glucoseValues.push(value);
+            }
+
+            document.getElementById('glucoseInput').value = glucoseValues.join('\n');
+            showStatus('step5', `Generated ${numWindows} random glucose values for testing`, 'info');
+        }
+
+        async function saveGlucoseLabels() {
+            const numWindows = parseInt(document.getElementById('numWindows').textContent);
+            const glucoseText = document.getElementById('glucoseInput').value.trim();
+
+            if (!glucoseText) {
+                showStatus('step5', 'Please enter glucose values', 'error');
+                return;
+            }
+
+            // Parse glucose values (support both newline and comma-separated)
+            let glucoseValues = glucoseText
+                .split(/[\n,]+/)
+                .map(v => v.trim())
+                .filter(v => v !== '')
+                .map(v => parseFloat(v));
+
+            // Validate
+            if (glucoseValues.some(v => isNaN(v))) {
+                showStatus('step5', 'Invalid glucose values. Please enter numbers only.', 'error');
+                return;
+            }
+
+            if (glucoseValues.length !== numWindows) {
+                showStatus('step5', `Error: Expected ${numWindows} values, but got ${glucoseValues.length}`, 'error');
+                return;
+            }
+
+            // Check for reasonable range (optional warning)
+            const outOfRange = glucoseValues.filter(v => v < 40 || v > 400);
+            if (outOfRange.length > 0) {
+                const proceed = confirm(`Warning: ${outOfRange.length} values are outside normal range (40-400 mg/dL). Continue anyway?`);
+                if (!proceed) return;
+            }
+
+            showStatus('step5', 'Saving glucose labels... <span class="loading"></span>', 'info');
+
+            try {
+                const response = await fetch('/api/save_glucose_labels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        glucose_labels: glucoseValues
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showStatus('step5', `Error: ${data.error}`, 'error');
+                    return;
+                }
+
+                showStatus('step5', `${data.message}`, 'success');
+
+                // Show statistics
+                const statsHtml = `
+                    <div class="stat-card">
+                        <h4>Number of Labels</h4>
+                        <div class="value">${data.num_labels}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Mean Glucose</h4>
+                        <div class="value">${data.stats.mean.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Std Deviation</h4>
+                        <div class="value">${data.stats.std.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Min Glucose</h4>
+                        <div class="value">${data.stats.min.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Max Glucose</h4>
+                        <div class="value">${data.stats.max.toFixed(1)}</div>
+                        <div class="unit">mg/dL</div>
+                    </div>
+                `;
+                document.getElementById('glucoseStats').innerHTML = statsHtml;
+                document.getElementById('glucoseStats').classList.remove('hidden');
+
+                // Download link
+                const downloadHtml = `
+                    <a href="/api/download_csv/${sessionId}/glucose_labels" download>Download Glucose Labels CSV</a>
+                `;
+                document.getElementById('glucoseDownload').innerHTML = downloadHtml;
+                document.getElementById('glucoseDownload').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('step5', `Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
